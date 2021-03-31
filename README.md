@@ -1,0 +1,2 @@
+# pinger
+Discord status bot
