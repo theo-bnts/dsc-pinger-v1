@@ -1,0 +1,9 @@
+[
+    {
+        "id": "bot_id",
+        "pings": [
+            true,
+            false
+        ]
+    }
+]

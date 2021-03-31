@@ -1,0 +1,19 @@
+{
+  "name": "pinger",
+  "version": "0.0.1",
+  "description": "Discord status bot",
+  "main": "index.js",
+  "author": "theo-bnts",
+  "license": "ISC",
+  "dependencies": {
+    "date-events": "^1.0.1",
+    "discord.js": "^12.5.1",
+    "fs": "0.0.1-security",
+    "needle": "^2.6.0"
+  },
+  "repository": {
+    "type": "github",
+    "url": "github.com/theo-bnts/pinger"
+  },
+  "keywords": ["status", "discord bot"]
+}
