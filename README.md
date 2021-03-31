@@ -9,4 +9,8 @@ This bot is provided without any guarantee of functioning, the commented parts a
 - Replace the default emojis by your own
 - Add a token to a Discord application
 
+# Commands
+- `_wsync`: setup
+- `_server`: add / remove a server
+
 © Fortool - By Théo Bontemps
