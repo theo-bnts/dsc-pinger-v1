@@ -1,5 +1,5 @@
 # Pinger
-A Discord status bot
+A Discord status bot\
 This bot allows you to monitor Discord bots, servers and sites.
 
 # Configuration
