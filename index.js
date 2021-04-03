@@ -5,8 +5,16 @@ const needle = require('needle');
 
 const client = new Discord.Client();
 
-////////// UNDER DEVELOPMENT //////////
-/*
+const conf = {
+    token: 'YOUR_TOKEN',
+    emojis: {
+        online: '<:online:820029341450371142>',
+        idle: '<:idle:820029341178134569>',
+        dnd: '<:dnd:820029341114171434>',
+        offline: '<:offline:820029341420748830>'
+    }
+}
+
 client.on('presenceUpdate', async (oldPres, newPres) => {
     if (newPres && newPres.user.bot && (!oldPres || oldPres.status == 'offline' || newPres.status == 'offline')) {
 
@@ -26,12 +34,21 @@ client.on('presenceUpdate', async (oldPres, newPres) => {
 
                 const userDowntimes = downtimes.find(d => d.id == newPres.user.id)
                 if (newPres.status == 'offline')
-                    downtimes.list.push({
+                    userDowntimes.list.push({
                         start: Date.now(),
                         end: null
                     })
-                else if (oldPres.status == 'offline' && !downtimes.list.last().end)
-                    downtimes.list.last().end == Date.now()
+                else {
+                    if (userDowntimes.list.length > 0 && !userDowntimes.list[userDowntimes.list.length-1].end)
+                        userDowntimes.list[userDowntimes.list.length-1].end = Date.now()
+                    else
+                        userDowntimes.list.push({
+                            start: null,
+                            end: Date.now()
+                        })
+                } 
+
+                downtimes.find(d => d.id == newPres.user.id).list = userDowntimes.list
 
                 fs.writeFileSync('data/downtimes.json', JSON.stringify(downtimes))
 
@@ -45,20 +62,22 @@ client.on('presenceUpdate', async (oldPres, newPres) => {
         }
     }
 })
-*/
 
 client.on('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
     clock.on('minute', async () => {
+        client.user.setActivity(`${client.guilds.cache.size} guilds | _help`, { type: 'WATCHING' });
+
         const wsyncs = JSON.parse(fs.readFileSync('data/wsync.json'))
         const pings = JSON.parse(fs.readFileSync('data/pings.json'))
 
         for (const wsync of wsyncs) {
             var guild, channel, message
+            guild = channel = message = null
             try {
-                guild = client.guilds.cache.find(g => g.id == wsync.guild)
-                channel = guild.channels.cache.find(c => c.id == wsync.channel)
+                guild = await client.guilds.cache.find(g => g.id == wsync.guild)
+                channel = await guild.channels.cache.find(c => c.id == wsync.channel)
                 message = await channel.messages.fetch(wsync.message)
             } catch (e) {}
 
@@ -89,15 +108,7 @@ client.on('ready', async () => {
                     const botPings = pings.find(b => b.id == member[1].user.id).pings
                     const uptime = botPings.filter(p => p == true).length / botPings.length * 100
 
-                    var emoji
-                    switch (member[1].presence.status) {
-                        case 'offline': emoji = '<:offline:820029341420748830>'; break;
-                        case 'dnd': emoji = '<:dnd:820029341114171434>'; break;
-                        case 'idle': emoji = '<:idle:820029341178134569>'; break;
-                        default: emoji = '<:online:820029341450371142>'; break;
-                    }
-
-                    embed.addField(member[1].user.tag, `${emoji} **${member[1].presence.status == 'offline' ? 'HORS' : 'EN'} LIGNE** - ${uptime.toFixed(2)}% uptime (7 jours)`)
+                    embed.addField(member[1].user.tag, `${conf.emojis[member[1].presence.status]} **${member[1].presence.status == 'offline' ? 'HORS' : 'EN'} LIGNE** - ${uptime.toFixed(2)}% uptime (7 jours)`)
                 }
             }
 
@@ -132,7 +143,7 @@ client.on('ready', async () => {
                     const serverPings = pings.find(b => b.id == server.value).pings
                     const uptime = serverPings.filter(p => p == true).length / serverPings.length * 100
 
-                    embed.addField(server.name, `**${reachable ? '<:online:820029341450371142> EN' : '<:offline:820029341420748830> HORS'} LIGNE** - ${uptime.toFixed(2)}% uptime (7 jours)`)
+                    embed.addField(server.name, `**${reachable ? conf.emojis.online + ' EN' :  conf.emojis.offline + ' HORS'} LIGNE** - ${uptime.toFixed(2)}% uptime (7 jours)`)
                 }
             }
 
@@ -151,6 +162,19 @@ client.on('message', async (message) => {
     
     if (!message.member.hasPermission('MANAGE_GUILD'))
         return message.channel.send(new Discord.MessageEmbed().setColor('#2f3136').setDescription('Vous avez besoin de la permission `MANAGE_GUILD` pour m\'utiliser.'))
+
+    if (message.content.startsWith('_help')) {
+        message.channel.send(
+            new Discord.MessageEmbed()
+                .setColor('#2f3136')
+                .setTitle('Commandes - Prefixe : _')
+                .addFields(
+                    { name: '_wsync', value: 'Configuration de base' },
+                    { name: '_server', value: 'Ajouter / Supprimer un serveur / Voir la liste des serveurs ajoutés' },
+                    { name: '_downtimes', value: 'Liste des downtimes d\'un bot' }
+                )
+        )
+    }
 
     if (message.content.startsWith('_wsync')) {
         const wsyncs = JSON.parse(fs.readFileSync('data/wsync.json'))
@@ -241,6 +265,36 @@ client.on('message', async (message) => {
         wsyncs.find(w => w.guild == message.guild.id).servers = wsync.servers
         fs.writeFileSync('data/wsync.json', JSON.stringify(wsyncs))
     }
+
+    if (message.content.startsWith('_downtimes')) {
+        const downtimes = JSON.parse(fs.readFileSync('data/downtimes.json'))
+        if (message.mentions.users.first()) {
+            if (downtimes.find(d => d.id == message.mentions.users.first().id) && downtimes.find(d => d.id == message.mentions.users.first().id).list && downtimes.find(d => d.id == message.mentions.users.first().id).list.length > 0) {
+                var userDowntimes = downtimes.find(d => d.id == message.mentions.users.first().id)
+                var desc = ''
+                for (const downtime of userDowntimes.list)
+                    desc += `${downtime.start ? new Date(downtime.start).toLocaleString('fr', { day: 'numeric', month: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }) : 'Non défini'} - ${downtime.end ? new Date(downtime.end).toLocaleString('fr', { day: 'numeric', month: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }) : 'Non défini'}\n`
+                message.channel.send(
+                    new Discord.MessageEmbed()
+                        .setColor('#2f3136')
+                        .setTitle('Temps d\'arrêt')
+                        .setDescription(desc)
+                )
+            } else {
+                message.channel.send(
+                    new Discord.MessageEmbed()
+                        .setColor('#2f3136')
+                        .setDescription('Aucun temps d\'arrêt pour cet utilisateur.')
+                )
+            }
+        } else {
+            message.channel.send(
+                new Discord.MessageEmbed()
+                    .setColor('#2f3136')
+                    .setDescription('La commande s\'utilise comme cela : `_downtimes [mention]`')
+            )
+        }
+    }
 })
 
-client.login('YOUR TOKEN');
+client.login(conf.token);
