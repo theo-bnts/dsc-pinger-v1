@@ -8,10 +8,10 @@ const client = new Discord.Client();
 const conf = {
     token: 'YOUR_TOKEN',
     emojis: {
-        online: '<:online:820029341450371142>',
-        idle: '<:idle:820029341178134569>',
-        dnd: '<:dnd:820029341114171434>',
-        offline: '<:offline:820029341420748830>'
+        online: '<:online:842073169410261042>',
+        idle: '<:idle:842073169400561744>',
+        dnd: '<:dnd:842073169111810049>',
+        offline: '<:offline:842073169384701952>'
     }
 }
 
@@ -22,7 +22,7 @@ client.on('presenceUpdate', async (oldPres, newPres) => {
         if (wsyncs.some(w => w.guild == newPres.guild.id)) {
 
             const wsync = wsyncs.find(w => w.guild == newPres.member.guild.id)
-            if (newPres.member.roles.cache.some(r => r.id == wsync.role)) {
+            if (newPres.member.roles.cache.some(r => wsync.roles.includes(r.id))) {
 
                 const downtimes = JSON.parse(fs.readFileSync('data/downtimes.json'))
 
@@ -52,12 +52,15 @@ client.on('presenceUpdate', async (oldPres, newPres) => {
 
                 fs.writeFileSync('data/downtimes.json', JSON.stringify(downtimes))
 
-                const user = await client.users.fetch(wsync.user)
-                user.send(
-                    new Discord.MessageEmbed()
-                        .setColor('#2f3136')
-                        .setDescription(`${newPres.user} est maintenant **${newPres.status == 'offline' ? 'HORS' : 'EN'} LIGNE** sur ${newPres.guild.name} !`)
-                )
+                for (const id of wsync.users) {
+                    const user = await client.users.fetch(id)
+                    user.send(
+                        new Discord.MessageEmbed()
+                            .setColor('#2f3136')
+                            .setDescription(`${newPres.user} est maintenant **${newPres.status == 'offline' ? 'HORS' : 'EN'} LIGNE** sur ${newPres.guild.name} !`)
+                    )
+                }
+
             }
         }
     }
@@ -86,12 +89,13 @@ client.on('ready', async () => {
             const embed = new Discord.MessageEmbed()
                 .setColor('#2f3136')
                 .setTitle('Statuts')
-                .addField('\u200B', '`Robots`')
                 .setFooter('Dernière mise à jour', client.user.avatarURL())
                 .setTimestamp()
 
             for (const member of guild.members.cache) {
-                if (member[1].user.bot && member[1].user != client.user && member[1].roles.cache.array().some(r => r.id == wsync.role)) {
+                if (member[1].user.bot && member[1].user != client.user && member[1].roles.cache.array().some(r => wsync.roles.includes(r.id))) {
+                    if (embed.fields.length == 0)
+                        embed.addField('\u200B', '`Robots`')
 
                     if (!pings.some(b => b.id == member[1].user.id))
                         pings.push({
@@ -136,8 +140,13 @@ client.on('ready', async () => {
                     fs.writeFileSync('data/pings.json', JSON.stringify(pings))
 
                     if (savedPings[savedPings.length-2] && savedPings[savedPings.length-2] != reachable) {
-                        const user = await client.users.fetch(wsync.user)
-                        user.send(new Discord.MessageEmbed().setColor('#2f3136').setDescription(`${server.name} (${server.value}) est maintenant **${reachable ? 'EN' : 'HORS'} LIGNE** !`))
+                        for (const id of wsync.users) {
+                            const user = await client.users.fetch(id)
+                            user.send(
+                                new Discord.MessageEmbed()
+                                    .setColor('#2f3136')
+                                    .setDescription(`${server.name} (${server.value}) est maintenant **${reachable ? 'EN' : 'HORS'} LIGNE** !`))
+                        }
                     }
 
                     const serverPings = pings.find(b => b.id == server.value).pings
@@ -147,7 +156,10 @@ client.on('ready', async () => {
                 }
             }
 
-            embed.addField('\u200B', '\u200B')
+            if (embed.fields.length == 0)
+                embed.addField('Aucun service à surveiller pour ce serveur.')
+            else
+                embed.addField('\u200B', '\u200B')
 
             await message.edit(embed)
         }
@@ -159,9 +171,6 @@ client.on('message', async (message) => {
 
     if (message.channel.type == 'dm')
         return message.channel.send(new Discord.MessageEmbed().setColor('#2f3136').setDescription('Vous ne pouvez pas m\'utiliser par messages privés.'))
-    
-    if (!message.member.hasPermission('MANAGE_GUILD'))
-        return message.channel.send(new Discord.MessageEmbed().setColor('#2f3136').setDescription('Vous avez besoin de la permission `MANAGE_GUILD` pour m\'utiliser.'))
 
     if (message.content.startsWith('_help')) {
         message.channel.send(
@@ -171,10 +180,23 @@ client.on('message', async (message) => {
                 .addFields(
                     { name: '_wsync', value: 'Configuration de base' },
                     { name: '_server', value: 'Ajouter / Supprimer un serveur / Voir la liste des serveurs ajoutés' },
-                    { name: '_downtimes', value: 'Liste des downtimes d\'un bot' }
+                    { name: '_downtimes', value: 'Liste des downtimes d\'un bot' },
+                    { name: '_invite', value: 'Inviter ' + client.user.username }
                 )
         )
     }
+
+    if (message.content.startsWith('_invite')) {
+        message.channel.send(
+            new Discord.MessageEmbed()
+                .setColor('#2f3136')
+                .setDescription('Pour m\'inviter, cliquez **[ici](https://invite-pinger.fortool.fr)**.')
+                .setFooter('MIT Licence - ©Fortool')
+        )
+    }
+
+    if (!message.member.hasPermission('MANAGE_GUILD'))
+        return message.channel.send(new Discord.MessageEmbed().setColor('#2f3136').setDescription('Vous avez besoin de la permission `MANAGE_GUILD` pour m\'utiliser.'))
 
     if (message.content.startsWith('_wsync')) {
         const wsyncs = JSON.parse(fs.readFileSync('data/wsync.json'))
@@ -198,9 +220,9 @@ client.on('message', async (message) => {
                     guild: message.guild.id,
                     channel: message.channel.id,
                     message: embed.id,
-                    role: collected.first().mentions.roles.first().id,
+                    roles: [collected.first().mentions.roles.first().id],
                     servers: [],
-                    user: collected.first().author.id
+                    users: [collected.first().author.id]
                 })
 
                 fs.writeFileSync('data/wsync.json', JSON.stringify(wsyncs))
